@@ -1,6 +1,6 @@
 import axios from 'axios';
 import {API_URL_OPTIONS} from '../../env';
-import {IOptionsDate} from '../optionsDownload';
+import {IOptionsDate} from '../interface';
 
 export const getOptions = async (inputValue: string) => {
   const urlStart = API_URL_OPTIONS;

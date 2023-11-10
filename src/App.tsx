@@ -9,32 +9,44 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import {
   IOptionsDate,
   ILinksOptionsDateName,
   IQuessionDownload,
-} from './optionsDownload';
+} from './interface';
 import {RadioFormView} from './component/Radioform';
 import {findSelectedOption} from './lib/findSelectedOption';
 import {findDubleSelected} from './lib/findDubleSelected';
 import {getOptions} from './api/getOptions';
-import {getLinkDownload} from './api/getLinkDownload';
+import {getDataLink} from './api/getDataLink';
+import {getDownLoadLink} from './api/getDownLoadLink';
+import {WSCheckStatus} from './lib/WSCheckStatus';
+import {selectedValue} from './lib/selectedValue';
+import {
+  COLOR_BTN,
+  ERR_TXT_MESSAGE,
+  TXT_ERROR_404,
+  TXT_ERROR_500,
+} from './constants';
 
 function App(): JSX.Element {
   const [inputValue, setInputValue] = useState('');
-  const [optionsD, setOptionsD] = useState<IOptionsDate>();
+  const [optionsD, setOptionsD] = useState<IOptionsDate | null | undefined>(
+    null,
+  );
+  const [convertingValue, setConvertingValue] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState('');
-  const [optionsForLink, setOptionsForLink] = useState<IQuessionDownload>();
+  const [optionsForLink, setOptionsForLink] =
+    useState<IQuessionDownload | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const colorBtn = '#4b8e2e';
 
   const onPressRadioForm = (val: ILinksOptionsDateName, key: string) => {
     setResultUrl('');
     setOptionsD(prev => {
-      if (!prev?.links) {
+      if (!prev || !prev?.links) {
         return prev;
       }
       const newOption = {...prev};
@@ -51,80 +63,119 @@ function App(): JSX.Element {
         });
       });
 
-      return {...prev, ...newOption};
+      return newOption;
     });
-    selectedValue(val);
+    selectedValue(val, setOptionsForLink);
   };
-
-  const selectedValue = (value: ILinksOptionsDateName) => {
-    setOptionsForLink(prev => {
-      if (prev) {
-        return {...prev, fquality: value.k, ftype: value.f};
-      }
-      return prev;
-    });
-  };
-
   const pressDownload = async () => {
-    setOptionsD(undefined);
+    if (!inputValue) {
+      return setOptionsD(ERR_TXT_MESSAGE);
+    }
+    setOptionsD(null);
     setResultUrl('');
     setIsLoading(true);
     try {
       const data = await getOptions(inputValue);
       setIsLoading(false);
+      if (!data) {
+        return setOptionsD(TXT_ERROR_500);
+      }
       if (data.mess) {
         return setOptionsD(data);
       }
       if (data.links) {
         findDubleSelected(data.links);
-      }
-      setOptionsD(data);
-      if (data && data?.links) {
-        const {f, k} = findSelectedOption(data.links);
+        const {f = '', k = ''} = findSelectedOption(data.links);
         const dataForLink: IQuessionDownload = {
           fname: data.fn || '',
-          fquality: k,
-          ftype: f,
+          fquality: k || '',
+          ftype: f || '',
           timeExpire: data.timeExpires || '',
           token: data.token || '',
           v_id: data.vid || '',
         };
         setOptionsForLink(prev => ({...prev, ...dataForLink}));
+        setOptionsD(data);
       }
     } catch (error) {
       setIsLoading(false);
-      setOptionsD({
-        mess: 'Что-то пошло не так. Попробуйте еще.',
-        status: 'error',
-      });
+      setOptionsD(TXT_ERROR_500);
     }
   };
 
   const pressLinkDownload = async () => {
     try {
-      if (optionsForLink) {
-        setIsLoading(true);
-        const data = await getLinkDownload(optionsForLink);
-        setIsLoading(false);
-        setResultUrl(data.result);
-        return;
+      if (!optionsForLink) {
+        return setOptionsD(TXT_ERROR_500);
       }
-      setOptionsD({
-        mess: 'Что-то пошло не так! Попробуйте еще раз нажать на кнопку загрузить или проверьте адрес ссылки.',
-        status: 'error',
-      });
-    } catch (error) {
+
+      setIsLoading(true);
+      const data = await getDataLink(optionsForLink);
+      if (!('c_status' in data)) {
+        return setOptionsD(TXT_ERROR_500);
+      }
+
+      if ('d_url' in data && data.d_url) {
+        return setResultUrl(data.d_url);
+      }
+
+      if (data.c_status === 'ok' && data.c_server) {
+        const responseData = await getDownLoadLink(
+          data.c_server,
+          optionsForLink,
+        );
+
+        if (!responseData) {
+          return setOptionsD(TXT_ERROR_404);
+        }
+
+        if (
+          responseData.status === 'success' &&
+          responseData.statusCode === 200
+        ) {
+          return setResultUrl(responseData.result);
+        }
+
+        if (
+          responseData.status === 'success' &&
+          responseData.statusCode === 300 &&
+          responseData.jobId
+        ) {
+          setConvertingValue('0');
+          WSCheckStatus(
+            data.c_server,
+            responseData.jobId,
+            setResultUrl,
+            setConvertingValue,
+            setOptionsD,
+          );
+          return;
+        }
+
+        setOptionsD(TXT_ERROR_404);
+      }
+
+      setOptionsD(TXT_ERROR_500);
       setIsLoading(false);
-      setOptionsD({
-        mess: 'Что-то пошло не так! Попробуйте еще раз нажать на кнопку загрузить или проверьте адрес ссылки.',
-        status: 'error',
-      });
+      setConvertingValue(null);
+      return;
+    } catch (error) {
+      setOptionsD(TXT_ERROR_500);
+      setConvertingValue(null);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.aria}>
       <StatusBar />
+      {convertingValue && (
+        <View style={styles.louding}>
+          <ActivityIndicator size={'large'} />
+          <Text>Converting... {convertingValue}</Text>
+        </View>
+      )}
       {isLoading && (
         <View style={styles.louding}>
           <ActivityIndicator size={'large'} />
@@ -132,14 +183,25 @@ function App(): JSX.Element {
       )}
       <ScrollView>
         <Text style={styles.textHeader}>Загрузка видео с Youtube</Text>
-        <TextInput
-          style={styles.input}
-          onChangeText={setInputValue}
-          value={inputValue}
-          placeholder="Вставте ссылку Youtube"
-        />
+        <View>
+          <TextInput
+            style={styles.input}
+            onChangeText={setInputValue}
+            value={inputValue}
+            placeholder="Вставте ссылку Youtube"
+          />
+          {inputValue && (
+            <TouchableOpacity
+              style={styles.inputClear}
+              onPress={() => setInputValue('')}>
+              <View>
+                <Text style={styles.inputClearText}>Х</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={styles.button}>
-          <Button onPress={pressDownload} title="Загрузить" color={colorBtn} />
+          <Button onPress={pressDownload} title="Загрузить" color={COLOR_BTN} />
         </View>
         {optionsD && (
           <>
@@ -159,7 +221,7 @@ function App(): JSX.Element {
                   <Button
                     onPress={() => Linking.openURL(resultUrl)}
                     title="Скачать"
-                    color={colorBtn}
+                    color={COLOR_BTN}
                   />
                 </View>
               ) : (
@@ -167,7 +229,7 @@ function App(): JSX.Element {
                   <Button
                     onPress={pressLinkDownload}
                     title="Получить"
-                    color={colorBtn}
+                    color={COLOR_BTN}
                   />
                 </View>
               )
@@ -184,6 +246,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#333333',
   },
+  inputView: {
+    position: 'relative',
+  },
+  inputClear: {
+    position: 'absolute',
+    end: '5%',
+    top: '28%',
+  },
+  inputClearText: {fontSize: 20},
   louding: {
     position: 'absolute',
     top: 0,

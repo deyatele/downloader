@@ -1,7 +1,7 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import RadioForm, {RadioButtonInput} from 'react-native-simple-radio-button';
-import {ILinksOptionsDateName, IOptionsDate} from './../optionsDownload';
+import {ILinksOptionsDateName, IOptionsDate} from '../interface';
 
 interface Props {
   optionsD: IOptionsDate;

@@ -1,7 +1,7 @@
-import {ILinksOptionsDate} from '../optionsDownload';
+import {ILinksOptionsDate, ILinksOptionsDateName} from '../interface';
 
 export const findDubleSelected = (data: ILinksOptionsDate): void => {
-  let result = [];
+  let result: ILinksOptionsDateName[] = [];
   Object.keys(data).forEach(item => {
     Object.keys(data[item]).forEach(item2 => {
       if (data[item][item2].selected) {
@@ -13,4 +13,7 @@ export const findDubleSelected = (data: ILinksOptionsDate): void => {
       }
     });
   });
+  if (!result.length) {
+    Object.values(data?.mp4)[0].selected = true;
+  }
 };

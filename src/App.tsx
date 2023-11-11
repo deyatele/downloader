@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {
   ActivityIndicator,
   Button,
+  Image,
   Linking,
   SafeAreaView,
   ScrollView,
@@ -31,6 +32,8 @@ import {
   TXT_ERROR_404,
   TXT_ERROR_500,
 } from './constants';
+import {API_URL_IMAGE} from '../env';
+import {timeConvert} from './lib/timeConvert';
 
 function App(): JSX.Element {
   const [inputValue, setInputValue] = useState('');
@@ -42,6 +45,7 @@ function App(): JSX.Element {
   const [optionsForLink, setOptionsForLink] =
     useState<IQuessionDownload | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [image, setImage] = useState('');
 
   const onPressRadioForm = (val: ILinksOptionsDateName, key: string) => {
     setResultUrl('');
@@ -74,8 +78,10 @@ function App(): JSX.Element {
     setOptionsD(null);
     setResultUrl('');
     setIsLoading(true);
+    setImage('');
     try {
       const data = await getOptions(inputValue);
+
       setIsLoading(false);
       if (!data) {
         return setOptionsD(TXT_ERROR_500);
@@ -94,10 +100,12 @@ function App(): JSX.Element {
           token: data.token || '',
           v_id: data.vid || '',
         };
+        setImage(`${API_URL_IMAGE}${data.vid}/0.jpg`);
         setOptionsForLink(prev => ({...prev, ...dataForLink}));
         setOptionsD(data);
       }
     } catch (error) {
+      setImage('');
       setIsLoading(false);
       setOptionsD(TXT_ERROR_500);
     }
@@ -147,11 +155,14 @@ function App(): JSX.Element {
             responseData.jobId,
             setResultUrl,
             setConvertingValue,
-            setOptionsD,
+            (e: React.SetStateAction<IOptionsDate | null | undefined>) => {
+              setOptionsD(e);
+              setImage('');
+            },
           );
           return;
         }
-
+        setImage('');
         setOptionsD(TXT_ERROR_404);
       }
 
@@ -160,6 +171,7 @@ function App(): JSX.Element {
       setConvertingValue(null);
       return;
     } catch (error) {
+      setImage('');
       setOptionsD(TXT_ERROR_500);
       setConvertingValue(null);
     } finally {
@@ -183,6 +195,8 @@ function App(): JSX.Element {
       )}
       <ScrollView>
         <Text style={styles.textHeader}>Загрузка видео с Youtube</Text>
+
+        {/* INPUT SEARCH */}
         <View>
           <TextInput
             style={styles.input}
@@ -200,11 +214,31 @@ function App(): JSX.Element {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* DOWNLOAD BUTTON */}
         <View style={styles.button}>
           <Button onPress={pressDownload} title="Загрузить" color={COLOR_BTN} />
         </View>
+
+        {/* CHECKBOX */}
         {optionsD && (
           <>
+            {/* PREVIEW */}
+            {image && (
+              <View style={styles.descriptionContainer}>
+                <Image source={{uri: image}} style={styles.imageStyle} />
+
+                <View style={styles.description}>
+                  <Text style={styles.textDescription}>
+                    Название: {optionsD.title}
+                  </Text>
+                  <Text style={styles.textDescription}>
+                    Продолжительность:{' '}
+                    {timeConvert(optionsD.t ? optionsD.t : 0)}
+                  </Text>
+                </View>
+              </View>
+            )}
             <View style={styles.viewErrorMess}>
               {optionsD.mess ? (
                 <Text style={styles.textErrorMess}>{optionsD.mess}</Text>
@@ -279,6 +313,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 10,
     borderColor: '#f23c74',
+    paddingRight: 30,
+    borderRadius: 10,
   },
   button: {
     width: '50%',
@@ -287,6 +323,27 @@ const styles = StyleSheet.create({
   },
   viewErrorMess: {justifyContent: 'center', alignItems: 'center'},
   textErrorMess: {textAlign: 'center', padding: 30},
+  imageStyle: {
+    width: 180,
+    height: 100,
+    borderRadius: 10,
+  },
+  descriptionContainer: {
+    display: 'flex',
+    gap: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  description: {
+    display: 'flex',
+    overflow: 'hidden',
+    width: 200,
+  },
+  textDescription: {
+    fontSize: 12,
+  },
 });
 
 export default App;

@@ -324,8 +324,8 @@ const styles = StyleSheet.create({
   viewErrorMess: {justifyContent: 'center', alignItems: 'center'},
   textErrorMess: {textAlign: 'center', padding: 30},
   imageStyle: {
-    width: 180,
-    height: 100,
+    width: 170,
+    height: 80,
     borderRadius: 10,
   },
   descriptionContainer: {
@@ -334,12 +334,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginBottom: 20,
+    paddingHorizontal: 10,
   },
   description: {
     display: 'flex',
     overflow: 'hidden',
-    width: 200,
+    width: 170,
   },
   textDescription: {
     fontSize: 12,

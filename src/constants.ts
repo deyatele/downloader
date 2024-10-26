@@ -10,5 +10,9 @@ export const TXT_ERROR_404 = {
   mess: 'Данные не найдены. Пожалуйста, попробуйте еще раз!',
   status: 'error',
 };
+export const TXT_ERROR_403 = {
+  mess: 'Данные не найдены. Пожалуйста, попробуйте данное видео загрузить отдельно!',
+  status: 'error',
+};
 
 export const COLOR_BTN = '#4b8e2e';

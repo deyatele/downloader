@@ -2,7 +2,6 @@ import React, {useState} from 'react';
 import {
   ActivityIndicator,
   Button,
-  Image,
   Linking,
   SafeAreaView,
   ScrollView,
@@ -13,30 +12,28 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  IOptionsDate,
-  ILinksOptionsDateName,
-  IQuessionDownload,
-} from './interface';
-import {RadioFormView} from './component/Radioform';
+import {IOptionsDate, IQuessionDownload} from './interface';
 import {findSelectedOption} from './lib/findSelectedOption';
 import {findDubleSelected} from './lib/findDubleSelected';
 import {getOptions} from './api/getOptions';
 import {getDataLink} from './api/getDataLink';
 import {getDownLoadLink} from './api/getDownLoadLink';
 import {WSCheckStatus} from './lib/WSCheckStatus';
-import {selectedValue} from './lib/selectedValue';
 import {
   COLOR_BTN,
   ERR_TXT_MESSAGE,
+  TXT_ERROR_403,
   TXT_ERROR_404,
   TXT_ERROR_500,
 } from './constants';
-import {API_URL_IMAGE} from '../env';
-import {timeConvert} from './lib/timeConvert';
+import {checkLink} from './lib/checkLink';
+import {getDataLinks} from './api/getDataLinks';
+import {Preview} from './component/Preview';
 
 function App(): JSX.Element {
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(
+    'https://youtu.be/Wo2TwPi3cNs?si=pneW87DsR_MZqzVo',
+  );
   const [optionsD, setOptionsD] = useState<IOptionsDate | null | undefined>(
     null,
   );
@@ -45,47 +42,33 @@ function App(): JSX.Element {
   const [optionsForLink, setOptionsForLink] =
     useState<IQuessionDownload | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [image, setImage] = useState('');
 
-  const onPressRadioForm = (val: ILinksOptionsDateName, key: string) => {
-    setResultUrl('');
-    setOptionsD(prev => {
-      if (!prev || !prev?.links) {
-        return prev;
-      }
-      const newOption = {...prev};
-      if (!newOption.links) {
-        return;
-      }
-      Object.keys(newOption.links).forEach(k => {
-        Object.keys(newOption.links![k]).forEach(name => {
-          if (k === val.f && name === key) {
-            newOption.links![k][name].selected = true;
-            return;
-          }
-          newOption.links![k][name].selected = null;
-        });
-      });
+  // const onPressRadioForm = (val: ILinksOptionsDateName, key: string) => {
+  //   setResultUrl('');
+  //   setOptionsD(prev => {
+  //     if (!prev || !prev?.links) {
+  //       return prev;
+  //     }
+  //     const newOption = {...prev};
+  //     if (!newOption.links) {
+  //       return;
+  //     }
+  //     Object.keys(newOption.links).forEach(k => {
+  //       Object.keys(newOption.links![k]).forEach(name => {
+  //         if (k === val.f && name === key) {
+  //           newOption.links![k][name].selected = true;
+  //           return;
+  //         }
+  //         newOption.links![k][name].selected = null;
+  //       });
+  //     });
 
-      return newOption;
-    });
-    selectedValue(val, setOptionsForLink);
-  };
-  const pressDownload = async () => {
-    if (!inputValue) {
-      return setOptionsD(ERR_TXT_MESSAGE);
-    }
-    setOptionsD(null);
-    setResultUrl('');
-    setIsLoading(true);
-    setImage('');
+  //     return newOption;
+  //   });
+  //   selectedValue(val, setOptionsForLink);
+  // };
+  const getOptionsValue = (data: IOptionsDate) => {
     try {
-      const data = await getOptions(inputValue);
-
-      setIsLoading(false);
-      if (!data) {
-        return setOptionsD(TXT_ERROR_500);
-      }
       if (data.mess) {
         return setOptionsD(data);
       }
@@ -100,17 +83,52 @@ function App(): JSX.Element {
           token: data.token || '',
           v_id: data.vid || '',
         };
-        setImage(`${API_URL_IMAGE}${data.vid}/0.jpg`);
         setOptionsForLink(prev => ({...prev, ...dataForLink}));
         setOptionsD(data);
       }
     } catch (error) {
-      setImage('');
       setIsLoading(false);
       setOptionsD(TXT_ERROR_500);
     }
   };
+  const pressDownload = async () => {
+    if (!inputValue) {
+      return setOptionsD(ERR_TXT_MESSAGE);
+    }
+    setOptionsD(null);
+    setResultUrl('');
+    setIsLoading(true);
+    const checkValue = await checkLink(inputValue);
+    if (checkValue === null) {
+      setIsLoading(false);
+      return setOptionsD(TXT_ERROR_500);
+    }
+    if (typeof checkValue === 'object') {
+      const dataArr: IOptionsDate[] = [];
 
+      checkValue.contents.forEach(async item => {
+        const data = await getDataLinks(
+          `https://youtu.be/${item.playlistVideoRenderer.videoId}`,
+        );
+        if (data) {
+          dataArr.push(data);
+        }
+        if (!data) {
+          return setOptionsD(TXT_ERROR_403);
+        }
+      });
+    }
+
+    if (typeof checkValue === 'string') {
+      const data = await getOptions(inputValue);
+      setIsLoading(false);
+      getOptionsValue(data);
+      if (!data) {
+        return setOptionsD(TXT_ERROR_500);
+      }
+      return data;
+    }
+  };
   const pressLinkDownload = async () => {
     try {
       if (!optionsForLink) {
@@ -208,9 +226,7 @@ function App(): JSX.Element {
             <TouchableOpacity
               style={styles.inputClear}
               onPress={() => setInputValue('')}>
-              <View>
-                <Text style={styles.inputClearText}>Х</Text>
-              </View>
+              <Text style={styles.inputClearText}>Х</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -224,31 +240,19 @@ function App(): JSX.Element {
         {optionsD && (
           <>
             {/* PREVIEW */}
-            {image && (
-              <View style={styles.descriptionContainer}>
-                <Image source={{uri: image}} style={styles.imageStyle} />
+            <Preview optionsD={optionsD} />
 
-                <View style={styles.description}>
-                  <Text style={styles.textDescription}>
-                    Название: {optionsD.title}
-                  </Text>
-                  <Text style={styles.textDescription}>
-                    Продолжительность:{' '}
-                    {timeConvert(optionsD.t ? optionsD.t : 0)}
-                  </Text>
-                </View>
-              </View>
-            )}
-            <View style={styles.viewErrorMess}>
-              {optionsD.mess ? (
-                <Text style={styles.textErrorMess}>{optionsD.mess}</Text>
-              ) : (
-                <RadioFormView
-                  optionsD={optionsD}
-                  onPressRadioForm={onPressRadioForm}
-                />
-              )}
-            </View>
+            {/* <View style={styles.viewErrorMess}>
+              {
+                optionsD.mess ? (
+                  <Text style={styles.textErrorMess}>{optionsD.mess}</Text>
+                ) : null
+                // <RadioFormView
+                //   optionsD={optionsD}
+                //   onPressRadioForm={onPressRadioForm}
+                // />
+              }
+            </View> */}
             {!optionsD.mess ? (
               resultUrl ? (
                 <View style={styles.button}>
@@ -279,6 +283,7 @@ const styles = StyleSheet.create({
   aria: {
     flex: 1,
     backgroundColor: '#333333',
+    position: 'relative',
   },
   inputView: {
     position: 'relative',
@@ -327,24 +332,6 @@ const styles = StyleSheet.create({
     width: 170,
     height: 80,
     borderRadius: 10,
-  },
-  descriptionContainer: {
-    display: 'flex',
-    gap: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-    paddingHorizontal: 10,
-  },
-  description: {
-    display: 'flex',
-    overflow: 'hidden',
-    width: 170,
-  },
-  textDescription: {
-    fontSize: 12,
   },
 });
 

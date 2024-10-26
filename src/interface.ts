@@ -27,6 +27,10 @@ export interface ILinksOptionsDateName {
   selected: boolean | null;
 }
 
+export interface ILinksOptionsDateArray {
+  [key: string]: ILinksOptionsDateName[];
+}
+
 export interface IQuessionDownload {
   v_id: string;
   ftype: string;
